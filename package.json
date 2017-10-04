@@ -1,0 +1,24 @@
+{
+  "name": "react-formish",
+  "version": "0.0.1",
+  "description": "React forms library",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && webpack"
+  },
+  "keywords": [],
+  "author": "Matt Insler <matt.insler@gmail.com>",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "8.0.32",
+    "@types/prop-types": "15.5.2",
+    "@types/react": "15.6.4",
+    "react": "15.6.2",
+    "prop-types": "15.6.0",
+    "ts-loader": "2.3.7",
+    "typescript": "2.5.3",
+    "webpack": "3.6.0"
+  }
+}
