@@ -6,8 +6,24 @@ import {
   FormContext, FormContextTypes
 } from './types';
 
-export function createForm<M>(initialData: M): FormComponent<M> {
-  class Form extends React.Component<FormProps<M>, M> {
+interface FormState<M> {
+  isSubmitting: boolean;
+  isValidating: boolean;
+  value: M;
+}
+
+const localState = {
+  cancel: false,
+  submit: false
+};
+
+export function createForm<M>(
+  initialData: M,
+  opts?: {
+    render?: (props: React.HTMLAttributes<HTMLFormElement>) => JSX.Element | null | false;
+  }
+): FormComponent<M> {
+  class Form extends React.Component<FormProps<M>, FormState<M>> {
     static childContextTypes = FormContextTypes;
 
     static field<F extends keyof M>(field: F, render: FieldRender<M[F]>): JSX.Element | null | false {
@@ -21,10 +37,14 @@ export function createForm<M>(initialData: M): FormComponent<M> {
         }
 
         render() {
-          return render({
+          const props = Object.assign({}, this.props, {
+            isSubmitting: this.context.form.isSubmitting,
+            isValidating: this.context.form.isValidating,
             onChange: this.onChange,
             value: this.context.form.value[field]
           });
+
+          return render(props);
         }
       }
 
@@ -34,33 +54,85 @@ export function createForm<M>(initialData: M): FormComponent<M> {
     constructor(props: FormProps<M>) {
       super(props);
 
-      this.state = Object.assign({}, initialData);
+      this.state = {
+        isSubmitting: false,
+        isValidating: false,
+        value: Object.assign({}, props.initialData || initialData)
+      };
     }
 
     getChildContext(): { form: FormContext<M> } {
       return {
         form: {
+          isSubmitting: this.state.isSubmitting,
+          isValidating: this.state.isValidating,
           setValue: <F extends keyof M>(field: F, value: M[F]): void => {
-            const newValue = Object.assign({}, this.state, { [field]: value });
-            this.setState(newValue);
+            const newValue = Object.assign({}, this.state.value, { [field]: value });
+            this.setState({ value: newValue });
           },
-          value: this.state
+          value: this.state.value
         }
       };
     }
 
-    onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const { onSubmit, onValidate } = this.props;
+    static cancel = () => {
+      localState.cancel = true;
+      setTimeout(() => localState.cancel = false);
+    };
+    static submit = () => {
+      localState.submit = true;
+      setTimeout(() => localState.submit = false);
+    }
 
-      onValidate && onValidate(this.state);
-      onSubmit && onSubmit(this.state);
+    onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const {
+        props: { onCancel, onSubmit, onValidate },
+        state
+      } = this;
+
+      if (localState.cancel && !localState.submit) {
+        return onCancel && onCancel();
+      }
+
+      if (onValidate) {
+        this.setState({ isValidating: true });
+        await Promise.resolve(onValidate(state.value));
+        this.setState({ isValidating: false });
+      }
+
+      if (onSubmit) {
+        this.setState({ isSubmitting: true });
+        await Promise.resolve(onSubmit(state.value));
+        this.setState({ isSubmitting: false });
+      }
     }
 
     render() {
+      const props: React.HTMLAttributes<HTMLFormElement> = Object.assign({}, this.props);
+
+      delete (props as any).initialData;
+      delete (props as any).onValidate;
+      delete (props as any).onValidateField;
+      props.onSubmit = this.onSubmit;
+      props.onKeyPress = (e) => {
+        if (e.which === 13) {
+          Form.submit();
+        }
+      }
+
+      if (opts && typeof(opts.render) === 'function') {
+        return opts.render(props);
+      }
+
+      const children = props.children;
+      delete props.children;
+
       return (
-        <form onSubmit={ this.onSubmit }>
-          { this.props.children }
+        <form { ...props }>
+          { children }
         </form>
       );
     }

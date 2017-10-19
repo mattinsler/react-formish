@@ -1,15 +1,16 @@
 {
   "name": "react-formish",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "React forms library",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {
-    "build": "rm -rf dist && webpack"
+    "build": "./build.sh"
   },
   "keywords": [],
   "author": "Matt Insler <matt.insler@gmail.com>",
+  "repository": "mattinsler/react-formish",
   "dependencies": {},
   "devDependencies": {
     "@types/node": "8.0.32",

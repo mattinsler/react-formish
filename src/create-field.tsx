@@ -22,19 +22,18 @@ export function createField<T, P = {}>(Component: FieldComponentImpl<T, P>): Fie
     }
 
     render() {
-      const props = Object.assign({}, this.props);
-      const field = props.field;
+      const field = this.props.field;
+
+      const props = Object.assign({}, this.props, {
+        isSubmitting: this.context.form.isSubmitting,
+        isValidating: this.context.form.isValidating,
+        onChange: this.onChange,
+        value: this.context.form.value[field]
+      });
+
       delete (props as any).field;
 
-      const value = this.context.form.value[field];
-
-      return (
-        <Component
-          { ...props }
-          onChange={ this.onChange }
-          value={ value }
-        />
-      );
+      return <Component { ...props } />;
     }
   }
 
