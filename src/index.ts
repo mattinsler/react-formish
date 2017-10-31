@@ -3,8 +3,8 @@ export { createForm } from './create-form';
 export {
   fieldValidationError,
   FieldValidationError,
-  validationError,
-  ValidationError
+  formValidationError,
+  FormValidationError
 } from './errors';
 export {
   ExternalFieldProps,

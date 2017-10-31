@@ -1,8 +1,17 @@
 import * as PropTypes from 'prop-types';
 
+import { FieldValidationError, FormValidationError } from './errors';
+
 export const FormContextTypes = {
   form: PropTypes.any
 };
+
+export type FieldValidator<T, C = any> = (data: {
+  component: C;
+  field: string;
+  value: T;
+}) => void;
+export type FormValidator<M> = (data: M) => void | Promise<void>;
 
 export interface FormProps<M> {
   children?: React.ReactNode;
@@ -12,16 +21,16 @@ export interface FormProps<M> {
   tabIndex?: number;
   title?: string;
 
+  error?: FormValidationError;
   initialData?: Readonly<M>;
 
   onCancel?(): void;
-
-  onSubmit?(data: M): void;
-  onValidate?(data: M): void | Promise<void>;
-  onValidateField?<K extends keyof M>(field: K, value: M[K]): void;
+  onSubmit(data: M): void;
+  onValidate?: FormValidator<M>;
 }
 
 export type FieldRender<T> = (opts: {
+  error?: FieldValidationError;
   isSubmitting: boolean;
   isValidating: boolean;
   onChange: React.ChangeEventHandler<any>;
@@ -33,22 +42,26 @@ export interface FormComponent<M> extends React.ComponentClass<FormProps<M>> {
 }
 
 export interface FormContext<M> {
+  error?: FormValidationError;
   isSubmitting: boolean;
   isValidating: boolean;
+  setFieldValidator<F extends keyof M>(field: F, validator: FieldValidator<M[F]>, component: React.Component): void;
   setValue<F extends keyof M>(field: F, value: M[F]): void;
   value: Readonly<M>;
 }
 
-export interface ExternalFieldProps {
+export interface ExternalFieldProps<T, P> {
   field: string;
+  onValidate?: FieldValidator<T, FieldComponentImpl<T, P>>;
 }
 
 export interface InternalFieldProps<T> {
+  error?: FieldValidationError;
   isSubmitting: boolean;
   isValidating: boolean;
   onChange: (value: T) => void;
   value: T;
 }
 
-export type FieldComponent<P> = React.ComponentClass<P & ExternalFieldProps>;
+export type FieldComponent<T, P> = React.ComponentClass<P & ExternalFieldProps<T, P>>;
 export type FieldComponentImpl<T, P> = React.ComponentClass<P & InternalFieldProps<T>>;

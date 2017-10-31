@@ -1,12 +1,22 @@
 import * as React from 'react';
 
+import { FieldValidationError, FormValidationError, formValidationError } from './errors';
 import {
-  FieldRender,
+  InternalFieldProps,
+  FieldRender, FieldValidator,
   FormComponent, FormProps,
   FormContext, FormContextTypes
 } from './types';
 
+type FieldValidatorMap<M> = {
+  [F in keyof M]?: {
+    component: React.Component;
+    validator: FieldValidator<M[F]>;
+  };
+}
+
 interface FormState<M> {
+  error?: FormValidationError;
   isSubmitting: boolean;
   isValidating: boolean;
   value: M;
@@ -17,6 +27,8 @@ const localState = {
   submit: false
 };
 
+import { createField } from './create-field';
+
 export function createForm<M>(
   initialData: M,
   opts?: {
@@ -26,35 +38,34 @@ export function createForm<M>(
   class Form extends React.Component<FormProps<M>, FormState<M>> {
     static childContextTypes = FormContextTypes;
 
-    static field<F extends keyof M>(field: F, render: FieldRender<M[F]>): JSX.Element | null | false {
-      class Field extends React.Component {
-        static contextTypes = FormContextTypes;
-
-        context: { form: FormContext<M> };
-
-        onChange = (e: React.ChangeEvent<any>) => {
-          this.context.form.setValue(field, e.target.value);
+    static field<F extends keyof M>(
+      field: F,
+      render: FieldRender<M[F]>,
+      onValidate?: FieldValidator<M[F]>
+    ): JSX.Element | null | false {
+      const Field = createField<any>(
+        class extends React.Component<InternalFieldProps<any>> {
+          onChange = (e: React.ChangeEvent<any>) => {
+            this.props.onChange(e.target.value);
+          }
+      
+          render() {
+            const props = Object.assign({}, this.props, { onChange: this.onChange });
+            return render(props);
+          }
         }
+      );
 
-        render() {
-          const props = Object.assign({}, this.props, {
-            isSubmitting: this.context.form.isSubmitting,
-            isValidating: this.context.form.isValidating,
-            onChange: this.onChange,
-            value: this.context.form.value[field]
-          });
-
-          return render(props);
-        }
-      }
-
-      return React.createElement(Field);
+      return <Field field={ field } onValidate={ onValidate } />;
     }
+
+    private fieldValidators: FieldValidatorMap<M> = {};
 
     constructor(props: FormProps<M>) {
       super(props);
 
       this.state = {
+        error: undefined,
         isSubmitting: false,
         isValidating: false,
         value: Object.assign({}, props.initialData || initialData)
@@ -64,8 +75,12 @@ export function createForm<M>(
     getChildContext(): { form: FormContext<M> } {
       return {
         form: {
+          error: this.state.error,
           isSubmitting: this.state.isSubmitting,
           isValidating: this.state.isValidating,
+          setFieldValidator: <F extends keyof M>(field: F, validator: FieldValidator<M[F]>, component: React.Component): void => {
+            this.fieldValidators[field] = { component, validator };
+          },
           setValue: <F extends keyof M>(field: F, value: M[F]): void => {
             const newValue = Object.assign({}, this.state.value, { [field]: value });
             this.setState({ value: newValue });
@@ -92,30 +107,90 @@ export function createForm<M>(
         props: { onCancel, onSubmit, onValidate },
         state
       } = this;
+      const validateFields = Object.keys(this.fieldValidators).length > 0;
+
+      this.setState({ error: undefined, isSubmitting: true });
 
       if (localState.cancel && !localState.submit) {
-        return onCancel && onCancel();
+        this.setState({ isSubmitting: false });
+        onCancel && onCancel();
+        return;
       }
 
-      if (onValidate) {
+      if (validateFields || onValidate) {
         this.setState({ isValidating: true });
-        await Promise.resolve(onValidate(state.value));
+
+        if (validateFields) {
+          const errors = [];
+
+          for (const [field, { component, validator }] of Object.entries(this.fieldValidators)) {
+            try {
+              validator({
+                component: component.wrappedComponent,
+                field,
+                value: (state.value as any)[field]
+              });
+            } catch (err) {
+              if (err instanceof FieldValidationError) {
+                err.field = field;
+                errors.push(err);
+              } else {
+                throw err;
+              }
+            }
+          }
+
+          if (errors.length > 0) {
+            this.setState({
+              error: formValidationError(errors),
+              isSubmitting: false,
+              isValidating: false
+            });
+            return;
+          }
+        }
+
+        if (onValidate) {
+          try {
+            await Promise.resolve(onValidate(state.value));
+          } catch (err) {
+            if (err instanceof FormValidationError) {
+              this.setState({
+                error: err,
+                isSubmitting: false,
+                isValidating: false
+              });
+              return;
+            } else {
+              throw err;
+            }
+          }
+        }
+
         this.setState({ isValidating: false });
       }
 
-      if (onSubmit) {
-        this.setState({ isSubmitting: true });
+      try {
         await Promise.resolve(onSubmit(state.value));
-        this.setState({ isSubmitting: false });
+      } catch (err) {
+        this.setState({
+          error: err,
+          isSubmitting: false
+        });
+        return;
       }
+      
+      this.setState({ isSubmitting: false });
     }
 
     render() {
-      const props: React.HTMLAttributes<HTMLFormElement> = Object.assign({}, this.props);
+      const { error, isSubmitting, isValidating } = this.state;
+      const props: React.HTMLAttributes<HTMLFormElement> = Object.assign({}, this.props, {
+        error, isSubmitting, isValidating
+      });
 
       delete (props as any).initialData;
       delete (props as any).onValidate;
-      delete (props as any).onValidateField;
       props.onSubmit = this.onSubmit;
       props.onKeyPress = (e) => {
         if (e.which === 13) {
