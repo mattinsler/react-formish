@@ -9,6 +9,7 @@ export const FormContextTypes = {
 export type FieldValidator<T, C = any> = (data: {
   component: C;
   field: string;
+  formValue: any;
   value: T;
 }) => void;
 export type FormValidator<M> = (data: M) => void | Promise<void>;
@@ -57,6 +58,7 @@ export interface ExternalFieldProps<T, P> {
 
 export interface InternalFieldProps<T> {
   error?: FieldValidationError;
+  formValue: any;
   isSubmitting: boolean;
   isValidating: boolean;
   onChange: (value: T) => void;

@@ -135,6 +135,7 @@ export function createForm<M>(
               validator({
                 component: component.wrappedComponent,
                 field,
+                formValue: state.value,
                 value: (state.value as any)[field]
               });
             } catch (err) {

@@ -43,6 +43,7 @@ export function createField<T, P = {}>(Component: FieldComponentImpl<T, P>): Fie
 
       Object.assign(props, {
         error: error instanceof FormValidationError ? error.errorByField[field] : undefined,
+        formValue: value,
         isSubmitting,
         isValidating,
         onChange: this.onChange,
