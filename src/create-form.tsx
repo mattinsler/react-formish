@@ -1,6 +1,11 @@
 import * as React from 'react';
 
-import { FieldValidationError, FormValidationError, formValidationError } from './errors';
+import {
+  FieldValidationError,
+  fieldValidationError,
+  FormValidationError,
+  formValidationError
+} from './errors';
 import {
   InternalFieldProps,
   FieldRender, FieldValidator,
@@ -103,6 +108,8 @@ export function createForm<M>(
       e.preventDefault();
       e.stopPropagation();
 
+      if (this.state.isSubmitting) { return; }
+
       const {
         props: { onCancel, onSubmit, onValidate },
         state
@@ -131,12 +138,9 @@ export function createForm<M>(
                 value: (state.value as any)[field]
               });
             } catch (err) {
-              if (err instanceof FieldValidationError) {
-                err.field = field;
-                errors.push(err);
-              } else {
-                throw err;
-              }
+              const error = err instanceof FieldValidationError ? err : fieldValidationError(err.message);
+              error.field = field;
+              errors.push(error);
             }
           }
 
@@ -154,16 +158,11 @@ export function createForm<M>(
           try {
             await Promise.resolve(onValidate(state.value));
           } catch (err) {
-            if (err instanceof FormValidationError) {
-              this.setState({
-                error: err,
-                isSubmitting: false,
-                isValidating: false
-              });
-              return;
-            } else {
-              throw err;
-            }
+            this.setState({
+              error: err instanceof FormValidationError ? err : formValidationError(err.message),
+              isSubmitting: false,
+              isValidating: false
+            });
           }
         }
 
