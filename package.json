@@ -1,6 +1,6 @@
 {
   "name": "react-formish",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "React forms library",
   "license": "MIT",
   "main": "dist/index.js",
